@@ -18,6 +18,9 @@ Parameters:
   ProductionAccount:
     Description: AWS AccountNumber for production
     Type: Number
+  ProductionAccount2:
+    Description: AWS AccountNumber for production2
+    Type: Number
   ProjectName:
     Description: Name of the Project
     Type: String
@@ -63,6 +66,7 @@ Resources:
             Principal:
               AWS:
                 - !Sub arn:aws:iam::${ProductionAccount}:root
+                - !Sub arn:aws:iam::${ProductionAccount2}:root
                 - !Sub arn:aws:iam::${TestAccount}:root
                 - !Sub arn:aws:iam::${DevAccount}:root
                 - !If
@@ -90,4 +94,3 @@ Outputs:
     Value: !GetAtt [KMSKey,Arn]
   ArtifactBucket:
     Value: !Ref ArtifactBucket
-

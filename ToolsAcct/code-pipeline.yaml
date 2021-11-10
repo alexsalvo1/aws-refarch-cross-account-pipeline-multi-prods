@@ -25,6 +25,9 @@ Parameters:
   ProductionAccount:
     Description: AWS AccountNumber for production
     Type: Number
+  ProductionAccount2:
+    Description: AWS AccountNumber for production2
+    Type: Number
   CMKARN:
     Description: ARN of the KMS CMK creates in Tools account
     Type: String
@@ -201,6 +204,7 @@ Resources:
             Resource:
               - !Sub arn:aws:iam::${DevAccount}:role/ToolsAcctCodePipelineCodeCommitRole
               - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
+              - !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
               - !Sub arn:aws:iam::${TestAccount}:role/ToolsAcctCodePipelineCloudFormationRole
 
       Roles:
@@ -368,6 +372,58 @@ Resources:
                 - AddCodeBuildResource
                 - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
                 - !Ref AWS::NoValue
+            - Name: CreateChangeSetProd2
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ChangeSetName: sample-lambda-production
+                ActionMode: CHANGE_SET_REPLACE
+                StackName: sample-lambda-production
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: BuildOutput::packaged-template.yml
+                #RoleArn: !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
+                  - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+              #RoleArn: !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
+                  - !Ref AWS::NoValue
+            - Name: DeployChangeSetProd2
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ChangeSetName: sample-lambda-production
+                ActionMode: CHANGE_SET_EXECUTE
+                StackName: sample-lambda-production
+                #RoleArn: !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
+                RoleArn:
+                  Fn::If:
+                  - AddCodeBuildResource
+                  - !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
+                  - !Ref AWS::NoValue
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 2
+              #RoleArn: !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
+              RoleArn:
+                Fn::If:
+                - AddCodeBuildResource
+                - !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
+                - !Ref AWS::NoValue
 
       ArtifactStore:
         Type: S3
@@ -395,4 +451,6 @@ Resources:
                 - !Sub arn:aws:iam::${TestAccount}:role/cloudformationdeployer-role
                 - !Sub arn:aws:iam::${ProductionAccount}:role/ToolsAcctCodePipelineCloudFormationRole
                 - !Sub arn:aws:iam::${ProductionAccount}:role/cloudformationdeployer-role
+                - !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
+                - !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
                 - !GetAtt [BuildProjectRole,Arn]
