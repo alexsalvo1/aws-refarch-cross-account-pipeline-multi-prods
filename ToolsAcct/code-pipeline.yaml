@@ -453,4 +453,4 @@ Resources:
                 - !Sub arn:aws:iam::${ProductionAccount}:role/cloudformationdeployer-role
                 - !Sub arn:aws:iam::${ProductionAccount2}:role/ToolsAcctCodePipelineCloudFormationRole
                 - !Sub arn:aws:iam::${ProductionAccount2}:role/cloudformationdeployer-role
-                - !GetAtt [BuildProjectRole,Arn]
+                - !GetAtt BuildProjectRole.Arn

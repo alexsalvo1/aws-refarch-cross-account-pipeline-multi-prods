@@ -91,6 +91,6 @@ Resources:
 
 Outputs:
   CMK:
-    Value: !GetAtt [KMSKey,Arn]
+    Value: !GetAtt KMSKey.Arn
   ArtifactBucket:
     Value: !Ref ArtifactBucket
