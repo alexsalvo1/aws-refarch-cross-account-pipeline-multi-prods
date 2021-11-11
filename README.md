@@ -86,3 +86,79 @@ Once you have your pipeline configured [as per the blog post](https://aws.amazon
 #### Next Steps
 * If you want to deploy a different type of application, you will need to edit the buildspec file defined in the [`code-pipeline.yaml`](https://github.com/awslabs/aws-refarch-cross-account-pipeline/blob/master/ToolsAcct/code-pipeline.yaml) file.
     * You will also need to change the permissions of the roles deployed to the test/dev accounts depending on what type of resources you are deploying. This is in the [`toolsacct-codepipeline-cloudformation-deployer.yaml`](https://github.com/awslabs/aws-refarch-cross-account-pipeline/blob/master/TestAccount/toolsacct-codepipeline-cloudformation-deployer.yaml#L74) file which gets deployed to the Test & Prod accounts in step 3 of the [blog instructions](https://aws.amazon.com/blogs/devops/aws-building-a-secure-cross-account-continuous-delivery-pipeline/).
+
+
+1 - In the Tools account, deploy this CloudFormation template. It will create the customer master keys (CMK) in AWS Key Management Service (AWS KMS), 
+    grant access to Dev, Test, Prod and Prod2 accounts to use these keys, and create an Amazon S3 bucket to hold artifacts from AWS CodePipeline.
+
+cd /Users/salvales/Project/Pipeline/aws-refarch-cross-account-pipeline
+aws cloudformation deploy --stack-name pre-reqs \
+--template-file ToolsAcct/pre-reqs.yaml --parameter-overrides \
+DevAccount=231312449617 TestAccount=574029865612 \
+ProductionAccount=014866128417 ProductionAccount2=006169631543 \
+--profile Pipeline-Tools
+
+
+2 - In the Dev account, which hosts the AWS CodeCommit repository, deploy this CloudFormation template. This template will create the IAM roles, 
+    which will later be assumed by the pipeline running in the Tools account. Enter the AWS account number for the Tools account and the CMK ARN.
+
+aws cloudformation deploy --stack-name toolsacct-codepipeline-role \
+--template-file DevAccount/toolsacct-codepipeline-codecommit.yaml \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ToolsAccount=281347101436 CMKARN=arn:aws:kms:eu-west-1:281347101436:key/8dbb8c2d-e2d2-4dcf-8a03-c241bd4f8731 \
+--profile Pipeline-Dev
+
+
+3 - In the Test and Prods accounts where you will deploy the Lambda code, execute this CloudFormation template. 
+    This template creates IAM roles, which will later be assumed by the pipeline to create, deploy, and update the sample AWS Lambda function through CloudFormation.
+
+aws cloudformation deploy --stack-name toolsacct-codepipeline-cloudformation-role \
+--template-file TestAccount/toolsacct-codepipeline-cloudformation-deployer.yaml \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ToolsAccount=281347101436 CMKARN=arn:aws:kms:eu-west-1:281347101436:key/8dbb8c2d-e2d2-4dcf-8a03-c241bd4f8731 \
+S3Bucket=pre-reqs-artifactbucket-wpjuv2hddvni \
+--profile Pipeline-Test
+
+aws cloudformation deploy --stack-name toolsacct-codepipeline-cloudformation-role \
+--template-file TestAccount/toolsacct-codepipeline-cloudformation-deployer.yaml \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ToolsAccount=281347101436 CMKARN=arn:aws:kms:eu-west-1:281347101436:key/8dbb8c2d-e2d2-4dcf-8a03-c241bd4f8731 \
+S3Bucket=pre-reqs-artifactbucket-wpjuv2hddvni \
+--profile Pipeline-Prod
+
+aws cloudformation deploy --stack-name toolsacct-codepipeline-cloudformation-role \
+--template-file TestAccount/toolsacct-codepipeline-cloudformation-deployer.yaml \
+--capabilities CAPABILITY_NAMED_IAM \
+--parameter-overrides ToolsAccount=281347101436 CMKARN=arn:aws:kms:eu-west-1:281347101436:key/8dbb8c2d-e2d2-4dcf-8a03-c241bd4f8731 \
+S3Bucket=pre-reqs-artifactbucket-wpjuv2hddvni \
+--profile Pipeline-Prod2
+
+
+4 - In the Tools account, which hosts AWS CodePipeline, execute this CloudFormation template. 
+    This creates a pipeline, but does not add permissions for the cross accounts (Dev, Test, Prod and Prod2).
+
+aws cloudformation deploy --stack-name sample-lambda-pipeline \
+--template-file ToolsAcct/code-pipeline.yaml \
+--parameter-overrides DevAccount=231312449617 TestAccount=574029865612 \
+ProductionAccount=014866128417 ProductionAccount2=006169631543 CMKARN=arn:aws:kms:eu-west-1:281347101436:key/8dbb8c2d-e2d2-4dcf-8a03-c241bd4f8731 \
+S3Bucket=pre-reqs-artifactbucket-wpjuv2hddvni --capabilities CAPABILITY_NAMED_IAM \
+--profile Pipeline-Tools
+
+
+5 - In the Tools account, execute this CloudFormation template, which give access to the role created in step 4. 
+    This role will be assumed by AWS CodeBuild to decrypt artifacts in the S3 bucket. This is the same template that was used in step 1, but with different parameters.
+
+aws cloudformation deploy --stack-name pre-reqs \
+--template-file ToolsAcct/pre-reqs.yaml \
+--parameter-overrides CodeBuildCondition=true \
+--profile Pipeline-Tools
+
+6 - In the Tools account, execute this CloudFormation template, which will do the following:
+    Add the IAM role created in step 2. This role is used by AWS CodePipeline in the Tools account for checking out code from the AWS CodeCommit repository in the Dev account.
+    Add the IAM role created in step 3. This role is used by AWS CodePipeline in the Tools account for deploying the code package to the Test and Prods accounts.
+
+aws cloudformation deploy --stack-name sample-lambda-pipeline \
+--template-file ToolsAcct/code-pipeline.yaml \
+--parameter-overrides CrossAccountCondition=true \
+--capabilities CAPABILITY_NAMED_IAM \
+--profile Pipeline-Tools
