@@ -1,5 +1,5 @@
 ## Initial Configuration
-To refer on the differents Account, I have created these AWS profiles:
+To refer on the differents Accounts, I have created these AWS profiles:
 - Pipeline-Tools
 - Pipeline-Dev
 - Pipeline-Test
@@ -42,7 +42,10 @@ Note the cloneUrlHttp URL in the response from above CLI.
 
 From your terminal application, execute the following command:
 
+Replace xxxxxxxxxxxx with the one generated during repository creation.
+
 ```console
+export HTTP_CLONE_URL=xxxxxxxxxxxx
 git remote add AWSCodeCommit $HTTP_CLONE_URL
 git config --global credential.helper '!aws --profile Pipeline-Dev codecommit credential-helper $@'
 ```
